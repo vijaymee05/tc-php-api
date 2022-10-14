@@ -1,0 +1,6 @@
+{
+    "require": {
+        "thrivecart/php-api": "^1.0",
+        "google/apiclient": "^2.0"
+    }
+}
