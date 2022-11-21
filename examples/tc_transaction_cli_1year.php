@@ -13,7 +13,6 @@ set_time_limit(0);
 ini_set('display_errors', '1');
 ini_set('display_startup_errors', '1');
 ini_set('default_socket_timeout', '100000');
-//echo $socket_timeout = ini_get('default_socket_timeout');exit;
 error_reporting(E_ALL);
 
 $access_token = 'QVBYWKME-6X0IW8KI-Y85V222X-48QO0M16';
@@ -29,25 +28,40 @@ $page = 1; // @note 1 through N
 $countRecordMatch = 1;
 
 $currentDate = date("Y-m-d");
+$firstQuarterRange = "2022-04-01";
+$firstQuarter = date("Y-m-d",strtotime($firstQuarterRange."-3 month"));
+$secondQuarterRange = "2022-07-01";
+$secondQuarter = date("Y-m-d",strtotime($secondQuarterRange."-3 month"));
+$thirdQuarterRange = "2022-10-01";
+$thirdQuarter = date("Y-m-d",strtotime($thirdQuarterRange."-3 month"));
+$fourthQuarterRange = "2023-01-01";
+$fourthQuarter = date("Y-m-d",strtotime($fourthQuarterRange."-3 month"));
+//echo "1st: ".$firstQuarter." 2nd: ".$secondQuarter." 3rd: ".$thirdQuarter." 4th: ".$fourthQuarter;exit;
 switch ($argv[1]) {
-	case "1month":
-		$timePeriod = date("Y-m-d",strtotime($currentDate."-1 month"));
-		$timePeriodLabel = "one month";
-		$sheetName = "TC-Month";
+	case "1q":
+		$quarterRange = "2022-04-01";
+		$timePeriod = date("Y-m-d",strtotime($quarterRange."-3 month"));
+		$timePeriodLabel = "First Quarter";
+		$sheetName = "TC-Year-1Qaurter";
 		break;
-	case "1year":
-		$timePeriod = date("Y-m-d",strtotime($currentDate."-1 year"));
-		$timePeriodLabel = "one year";
-		$sheetName = "TC-Year";
+	case "2q":
+		$quarterRange = "2022-07-01";
+		$timePeriod = date("Y-m-d",strtotime($quarterRange."-3 month"));
+		$timePeriodLabel = "Second Quarter";
+		$sheetName = "TC-Year-2Qaurter";
 		break;
-	case "7days":
-		$timePeriod = date("Y-m-d",strtotime($currentDate."-7 day"));
-		$timePeriodLabel = "seven days";
-		$sheetName = "TC";
+	case "3q":
+		$quarterRange = "2022-10-01";
+		$timePeriod = date("Y-m-d",strtotime($quarterRange."-3 month"));
+		$timePeriodLabel = "Third Quarter";
+		$sheetName = "TC-Year-3Qaurter";
+		break;
 	default:
-		$timePeriod = date("Y-m-d",strtotime($currentDate."-7 day"));
-		$timePeriodLabel = "seven days";
-		$sheetName = "TC";
+		$quarterRange = "2023-01-01";
+		$timePeriod = date("Y-m-d",strtotime($quarterRange."-3 month"));
+		$timePeriodLabel = "Final Quarter";
+		$sheetName = "TC-Year-4Qaurter";
+		break;
 }
 
 // Now let's make our API request
@@ -66,8 +80,6 @@ try {
 		$total_pages = ceil($response['meta']['total'] / $perPage);
 		$remaining_pages = $total_pages - $page;
 	}
-	//$currentDate = date("Y-m-d");
-	//$sevenDays = date("Y-m-d",strtotime($currentDate."-7 day"));
 	$lead_sources =array();
 	$dateMatched = false;
 	//Collect the all the date matched data into single array first
@@ -80,12 +92,11 @@ try {
 			'page' => $i,
 			'perPage' => $perPage,
 		));
-		//echo "<pre>Final Response: ";print_r($final_response['transactions']);
 		if($dateMatched === false){
 			foreach ($final_response['transactions'] as $key=>$value) {
-				echo "\nStep-3: Checking date is matched with last ".$timePeriodLabel." i.e.(". $timePeriod.").\n";
-				echo " \n\t\t Customer email is ".$value['customer']['email']." and transaction date is: ".$value['date']."\n";
-				if($value['date'] >= $timePeriod ){
+				echo "\nStep-3: Checking data for ".$timePeriodLabel." i.e.(". $timePeriod.").\n";
+				if($value['date'] >= $timePeriod && $value['date'] < $quarterRange ){
+					echo " \n\t\t Customer email is ".$value['customer']['email']." and transaction date is: ".$value['date']."\n";
 					$countRecordMatch ++;
 					$customer = $tc->customer(array(
 						'email' => $value['customer']['email'],
@@ -99,10 +110,10 @@ try {
 					$lead_sources[] = array('item_name'=>$lead_name,'name'=> $value['customer']['name'],'email'=> $value['customer']['email'], 'amount'=> floatval($value['amount']/100));
 					sleep(4);
 				}
-				else{
+				elseif($value['date'] <= $timePeriod){
 					$dateMatched = true;
 					break;
-				}			
+				}
 			}
 		}
 	}
@@ -113,7 +124,6 @@ try {
 	echo "\nStep-6: Lead Source data manipulation is started.\n";
 	$users =array();
 	foreach ($lead_sources as $lead_source) {
-		
 		$amount = 0;
 		if(!in_array($lead_source['email'], $users)){
 			$users[] = $lead_source['email'];
@@ -133,7 +143,6 @@ try {
 	$count=0;
 	
 	foreach ($updatedUsers as $updatedUser) {
-		
 		if(!in_array($updatedUser[3], $lead_sources)){
 			$userCount = 1;
 			$lead_sources[$count] = $updatedUser[3];
@@ -148,7 +157,6 @@ try {
 			$updatedLeads[$updatedUser[3]] = [$updatedUser[3], (floatval($updatedUser[2])+ floatval($amount)), ($newCount+$userCount)];
 			//$feedLeads[] = [$updatedUser[3], (floatval($updatedUser[2])+ floatval($amount)), ($newCount+$userCount)];
 		}
-		
 	}
 	echo "\nStep-7: Lead Source data manipulation is completed.\n";
 	echo "\nStep-8: User data and lead source data started to feed into google sheet.\n";
@@ -244,8 +252,4 @@ function getClient()
     }
     return $client;
 }
-?>
-
-<?php
-//include 'inc.footer.php';
 ?>
